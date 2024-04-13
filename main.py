@@ -1,3 +1,4 @@
+from telnetlib import EC
 from time import sleep
 from wsgiref import headers
 
@@ -5,6 +6,10 @@ import requests
 from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.action_chains import ActionChains
 
 options = Options()
 options.add_argument('--no-sandbox')
@@ -71,35 +76,42 @@ def parse_one_property(url):
     else:
         price = "Ціну не вдалося знайти"
     print(price)
-    photo_containers = soup.select(
-        "#overview > div:nth-child(3) > div.thumbnail.last-child.first-child > div > div.secondary-photos-container > a.secondary-photo-container"
-    )
 
-    button_container = soup.select_one(
-        "#overview > div:nth-child(3) > div.thumbnail.last-child.first-child > div > div.photo-buttons.legacy-reset "
-    )
-    print(button_container)
-    # if button_container:
-    #     button = button_container.find_parent("button")
-    #
-    #     # Перевірте, чи кнопка була знайдена
-    #     if button:
-    #         button.click()
-    #         sleep(2)  # Зачекайте, щоб галерея фотографій з'явилася
-    #
-    #         # Отримайте фото контейнери з галереї
-    #         photo_containers = soup.select(
-    #             "#overview div.photo-viewer-container > div.photo-viewer-cell > div.photo-viewer-photo")
-    #
-    #         photo_links = []
-    #         for container in photo_containers:
-    #             img_tag = container.find("img")
-    #             if img_tag and "src" in img_tag.attrs:
-    #                 photo_link = img_tag["src"]
-    #                 photo_links.append(photo_link)
-    #                 print(photo_link)
-    #
-    #         return (str(title), str(address), str(price), photo_links, response.status_code)
+    driver = webdriver.Chrome(options=options)
+
+    try:
+        driver.get(url)
+
+        wait = WebDriverWait(driver, 10)
+        button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR,
+                                                        "#overview > div:nth-child(3) > div.thumbnail.last-child.first-child > div > div.photo-buttons.legacy-reset > button")))
+
+        button.click()
+        sleep(1)
+        img_element = driver.find_element(By.ID, "fullImg")
+        photo_url = img_element.get_attribute("src")
+        link_list = []
+        link_list.append(photo_url)
+
+        next_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR,
+                                                             "# gallery > div.image-wrapper > div.wrap.activateNextArrow")))
+        next_button.click()
+        # gallery > div.image-wrapper > div.wrap.activateNextArrow
+        # wait.until(EC.visibility_of_element_located((By.ID, "fullImg")))
+        #
+        # full_img_element = driver.find_element(By.ID, "fullImg")
+        # ActionChains(driver).double_click(full_img_element).perform()
+        #
+        # photo_url = full_img_element.get_attribute("src")
+        # link_list.append(photo_url)
+        print(link_list)
+
+
+    except Exception as e:
+        print("Помилка:", e)
+    finally:
+        driver.quit()
+
     return(response.status_code)
 
 def main():
