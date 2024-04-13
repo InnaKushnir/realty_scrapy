@@ -1,21 +1,10 @@
+from time import sleep
 from wsgiref import headers
 
 import requests
 from bs4 import BeautifulSoup
 from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.by import By
-from time import sleep
-
-from selenium.webdriver.support.wait import WebDriverWait
-
-
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
 
 options = Options()
 options.add_argument('--no-sandbox')
@@ -47,8 +36,12 @@ def get_links() -> list:
             urls = []
 
             for item in property_items:
-                print(item.find("a")["href"])
-                urls.append(item.find("a")["href"])
+                property_url = item.find("a")["href"]
+                full_url = f"https://realtylink.org{property_url}"
+                print(full_url)
+                urls.append(full_url)
+
+            return urls
 def parse_page(urls):
     for url in urls:
         parse_one_property(url)
@@ -56,7 +49,58 @@ def parse_page(urls):
 
 def parse_one_property(url):
     response = requests.get(url, headers=headers)
-    return response.status_code
+    soup = BeautifulSoup(response.text, "html.parser")
+    title_container = soup.select_one(
+        "#overview > div.row.property-tagline > div.d-none.d-sm-block.house-info > div > div.col.text-left.pl-0 h1[itemprop='category']")
+    if title_container:
+        title = title_container.text.strip()
+    else:
+        title = "Назву не вдалося знайти"
+    print(title)
+    address_container = soup.select_one(
+        "#overview > div.row.property-tagline > div.d-none.d-sm-block.house-info > div > div.col.text-left.pl-0 div.d-flex.mt-1 h2.pt-1"
+    )
+    address = address_container.text.strip()
+    print(address)
+    price_container = soup.select_one(
+        "#overview > div.row.property-tagline > div.d-none.d-sm-block.house-info > div > div.price-container > div.price.text-right"
+    )
+
+    if price_container:
+        price = price_container.text.strip()
+    else:
+        price = "Ціну не вдалося знайти"
+    print(price)
+    photo_containers = soup.select(
+        "#overview > div:nth-child(3) > div.thumbnail.last-child.first-child > div > div.secondary-photos-container > a.secondary-photo-container"
+    )
+
+    button_container = soup.select_one(
+        "#overview > div:nth-child(3) > div.thumbnail.last-child.first-child > div > div.photo-buttons.legacy-reset "
+    )
+    print(button_container)
+    # if button_container:
+    #     button = button_container.find_parent("button")
+    #
+    #     # Перевірте, чи кнопка була знайдена
+    #     if button:
+    #         button.click()
+    #         sleep(2)  # Зачекайте, щоб галерея фотографій з'явилася
+    #
+    #         # Отримайте фото контейнери з галереї
+    #         photo_containers = soup.select(
+    #             "#overview div.photo-viewer-container > div.photo-viewer-cell > div.photo-viewer-photo")
+    #
+    #         photo_links = []
+    #         for container in photo_containers:
+    #             img_tag = container.find("img")
+    #             if img_tag and "src" in img_tag.attrs:
+    #                 photo_link = img_tag["src"]
+    #                 photo_links.append(photo_link)
+    #                 print(photo_link)
+    #
+    #         return (str(title), str(address), str(price), photo_links, response.status_code)
+    return(response.status_code)
 
 def main():
     links = get_links()
@@ -64,7 +108,7 @@ def main():
 
 
 if __name__ == '__main__':
-    get_links()
+    main()
 # driver.get(url)
 #
 # wait = WebDriverWait(driver, 10)
