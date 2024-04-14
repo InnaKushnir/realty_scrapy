@@ -7,9 +7,8 @@ from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.common.action_chains import ActionChains
+from selenium.webdriver.support.ui import WebDriverWait
 
 options = Options()
 options.add_argument('--no-sandbox')
@@ -27,6 +26,7 @@ headers = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36"
 }
 
+
 def get_links() -> list:
     response = requests.get(url, headers=headers)
 
@@ -36,7 +36,8 @@ def get_links() -> list:
         property_container = soup.find("div", id="property-result")
 
         if property_container:
-            property_items = property_container.find_all("div", class_="thumbnail property-thumbnail-feature legacy-reset")
+            property_items = property_container.find_all("div",
+                                                         class_="thumbnail property-thumbnail-feature legacy-reset")
 
             urls = []
 
@@ -47,6 +48,8 @@ def get_links() -> list:
                 urls.append(full_url)
 
             return urls
+
+
 def parse_page(urls):
     for url in urls:
         parse_one_property(url)
@@ -66,7 +69,13 @@ def parse_one_property(url):
         "#overview > div.row.property-tagline > div.d-none.d-sm-block.house-info > div > div.col.text-left.pl-0 div.d-flex.mt-1 h2.pt-1"
     )
     address = address_container.text.strip()
+
+    address_parts = address.split(',', maxsplit=1)
+
+    region_parts = address_parts[1].strip().split()
+    region = ' '.join(region_parts[-2:])
     print(address)
+    print(region)
     price_container = soup.select_one(
         "#overview > div.row.property-tagline > div.d-none.d-sm-block.house-info > div > div.price-container > div.price.text-right"
     )
@@ -75,12 +84,29 @@ def parse_one_property(url):
         price = price_container.text.strip()
     else:
         price = "Ціну не вдалося знайти"
+
     print(price)
 
-    driver = webdriver.Chrome(options=options)
+    description_element = soup.find('div', class_='property-description')
+
+    description_text = description_element.find('div', itemprop='description').get_text(strip=True)
+
+    print(description_text)
+
 
     try:
+        driver = webdriver.Chrome(options=options)
         driver.get(url)
+
+        driver.execute_script('''
+            var carousel = document.querySelector('.carousel ul');
+            if (carousel) {
+                var liTags = carousel.querySelectorAll('li');
+                liTags.forEach(li => {
+                    li.style.display = 'block';
+                });
+            }
+            ''')
 
         wait = WebDriverWait(driver, 10)
         button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR,
@@ -88,14 +114,62 @@ def parse_one_property(url):
 
         button.click()
         sleep(1)
-        img_element = driver.find_element(By.ID, "fullImg")
-        photo_url = img_element.get_attribute("src")
+        html = driver.page_source
+        soup = BeautifulSoup(html, "html.parser")
         link_list = []
-        link_list.append(photo_url)
+        carousel = soup.find("div", class_="carousel")
+        if carousel:
+            li_tags = carousel.find_all("li")
+            for li in li_tags:
+                img_tag = li.find("img")
+                if img_tag:
+                    src = img_tag.get("src")
+                    link_list.append(src)
+        print(link_list)
+        while True:
+            container = WebDriverWait(driver, 10).until(
+                EC.visibility_of_element_located(
+                    (By.CSS_SELECTOR, "#gallery > div.footer > div > div > div:nth-child(3)"))
+            )
 
-        next_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR,
-                                                             "# gallery > div.image-wrapper > div.wrap.activateNextArrow")))
-        next_button.click()
+            driver.execute_script("arguments[0].style.display = 'block';", container)
+
+            next_button = WebDriverWait(driver, 10).until(
+                EC.element_to_be_clickable(
+                    (By.CSS_SELECTOR, "#gallery > div.footer > div > div > div:nth-child(3) .nav-next"))
+            )
+            print(next_button)
+            next_button.click()
+
+            sleep(1)
+
+            html = driver.page_source
+            soup = BeautifulSoup(html, "html.parser")
+            link_list_next = []
+            carousel = soup.find("div", class_="carousel")
+            print(carousel)
+            # if carousel:
+            #     li_tags = carousel.find_all("li")
+            #     for li in li_tags:
+            #         img_tag = li.find("img")
+            #         if img_tag:
+            #             src = img_tag.get("src")
+            #             link_list_next.append(src)
+            #
+            # if len(link_list_next) == len(link_list):
+            break
+
+            # Оновіть попередній список зображень
+            previous_link_list = link_list
+        driver.quit()
+        # img_element = driver.find_element(By.ID, "fullImg")
+        # photo_url = img_element.get_attribute("src")
+        # link_list = []
+        # link_list.append(photo_url)
+        #
+        # next_arrow = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR,
+        #                                                     "#gallery > div.image-wrapper > div.wrap.activateNextArrow > div.spinner-border.text-primary")))
+        # next_arrow.click()
         # gallery > div.image-wrapper > div.wrap.activateNextArrow
         # wait.until(EC.visibility_of_element_located((By.ID, "fullImg")))
         #
@@ -104,15 +178,16 @@ def parse_one_property(url):
         #
         # photo_url = full_img_element.get_attribute("src")
         # link_list.append(photo_url)
-        print(link_list)
 
 
+    # gallery > div.image-wrapper > div.wrap.activateNextArrow > div.logo
     except Exception as e:
         print("Помилка:", e)
     finally:
         driver.quit()
 
-    return(response.status_code)
+    return (response.status_code)
+
 
 def main():
     links = get_links()
@@ -138,37 +213,37 @@ if __name__ == '__main__':
 #
 # driver.quit()
 
-    # if property_container:
-    #     property_items = property_container.find_all("div", class_="thumbnail property-thumbnail-feature legacy-reset")
-    #
-    #     json_objects = []
-    #
-    #     for item in property_items:
-    #         property_link = item.find("a")["href"]
-    #
-    #         address_container = item.select_one(
-    #             "#overview > div.row.property-tagline > div.d-none.d-sm-block.house-info > div > div.col.text-left.pl-0 > div.d-flex.mt-1 h2.pt-1")
-    #         if address_container:
-    #             address = address_container.get_text.strip()
-    #         else:
-    #             address = "Адресу не вдалося знайти"
-    #
-    #         json_object = {
-    #             "link": property_link,
-    #             "title": "Назва оголошення",
-    #             "region": "Регіон",
-    #             "address": address,
-    #             "description": "Опис оголошення",
-    #             "images": ["https://link-to-image1.jpg", "https://link-to-image2.jpg"],
-    #             "publication_date": "2024-04-12",
-    #             "price": 1000,
-    #             "rooms": 3,
-    #             "area": 120
-    #         }
-    #
-    #         json_objects.append(json_object)
-    #
-    #     for obj in json_objects:
-    #         print(json.dumps(obj, ensure_ascii=False, indent=2))
-    # else:
-    #     print("Сталася помилка при отриманні сторінки:", response.status_code)
+# if property_container:
+#     property_items = property_container.find_all("div", class_="thumbnail property-thumbnail-feature legacy-reset")
+#
+#     json_objects = []
+#
+#     for item in property_items:
+#         property_link = item.find("a")["href"]
+#
+#         address_container = item.select_one(
+#             "#overview > div.row.property-tagline > div.d-none.d-sm-block.house-info > div > div.col.text-left.pl-0 > div.d-flex.mt-1 h2.pt-1")
+#         if address_container:
+#             address = address_container.get_text.strip()
+#         else:
+#             address = "Адресу не вдалося знайти"
+#
+#         json_object = {
+#             "link": property_link,
+#             "title": "Назва оголошення",
+#             "region": "Регіон",
+#             "address": address,
+#             "description": "Опис оголошення",
+#             "images": ["https://link-to-image1.jpg", "https://link-to-image2.jpg"],
+#             "publication_date": "2024-04-12",
+#             "price": 1000,
+#             "rooms": 3,
+#             "area": 120
+#         }
+#
+#         json_objects.append(json_object)
+#
+#     for obj in json_objects:
+#         print(json.dumps(obj, ensure_ascii=False, indent=2))
+# else:
+#     print("Сталася помилка при отриманні сторінки:", response.status_code)
