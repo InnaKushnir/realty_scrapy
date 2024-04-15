@@ -29,32 +29,27 @@ headers = {
 }
 
 
-def get_links() -> list:
-    response = requests.get(url, headers=headers)
-
-    if response.status_code == 200:
-        html_content = response.text
-        soup = BeautifulSoup(html_content, "html.parser")
+def get_links():
+    all_links = []
+    driver.get(url)
+    count = 0
+    while count < 60:
+        response = driver.page_source
+        soup = BeautifulSoup(response, "html.parser")
         property_container = soup.find("div", id="property-result")
-
         if property_container:
-            property_items = property_container.find_all("div",
-                                                         class_="thumbnail property-thumbnail-feature legacy-reset")
-
-            urls = []
-
-            for item in property_items:
-                property_url = item.find("a")["href"]
-                full_url = f"https://realtylink.org{property_url}"
-                print(full_url)
-                urls.append(full_url)
-
-            return urls
-
-
-def parse_page(urls):
-    for url in urls:
-        parse_one_property(url)
+            property_items = property_container.find_all("div", class_="thumbnail property-thumbnail-feature legacy-reset")
+            urls = [f"https://realtylink.org{item.find('a')['href']}" for item in property_items]
+            all_links.extend(urls)
+            count += len(urls)
+        pager_container = driver.find_element(By.ID, "divWrapperPager")
+        next_button = pager_container.find_element(By.CLASS_NAME, "next")
+        if next_button:
+            next_button.click()
+        else:
+            break
+    driver.quit()
+    return all_links[:60]
 
 
 def parse_one_property(url):
@@ -87,15 +82,14 @@ def parse_one_property(url):
     else:
         price = "Ціну не вдалося знайти"
 
-    print(price)
     area = soup.select_one(
         "#overview > div.grid_3 > div.col-lg-12.description > div:nth-child(6) > div:nth-child(1) > div.carac-value > span")
     area_string = area.text.strip()
     area = area_string.split()[0]
 
-    # rooms = soup.select_one("#overview > div.grid_3 > div.col-lg-12.description > div.row.teaser > div.col-lg-3.col-sm-6.cac")
-    # rooms_text = rooms.text.strip()
-    # rooms = ''.join(filter(str.isdigit, rooms_text))
+    rooms = soup.select_one("#overview > div.grid_3 > div.col-lg-12.description > div.row.teaser > div.col-lg-3.col-sm-6.cac")
+    rooms_text = rooms.text.strip()
+    rooms = ''.join(filter(str.isdigit, rooms_text))
 
     description_element = soup.find('div', class_='property-description')
     try:
@@ -104,13 +98,13 @@ def parse_one_property(url):
         print("Помилка при отриманні опису:", e)
         description_text = None
 
-    meta_tags = soup.find_all('meta')
-    print(meta_tags)
-    for tag in meta_tags:
-        if tag.get('name') == 'last-modified':
-            last_modified = tag.get('content')
-            print('Дата останнього оновлення:', last_modified)
-            break
+    # meta_tags = soup.find_all('meta')
+    # print(meta_tags)
+    # for tag in meta_tags:
+    #     if tag.get('name') == 'last-modified':
+    #         last_modified = tag.get('content')
+    #         print('Дата останнього оновлення:', last_modified)
+    #         break
 
     try:
         driver = webdriver.Chrome(options=options)
@@ -143,29 +137,28 @@ def parse_one_property(url):
                 if img_tag:
                     src = img_tag.get("src")
                     link_list.append(src)
-        print(link_list)
-        while True:
-            container = WebDriverWait(driver, 10).until(
-                EC.visibility_of_element_located(
-                    (By.CSS_SELECTOR, "#gallery > div.footer > div > div > div:nth-child(3)"))
-            )
 
-            driver.execute_script("arguments[0].style.display = 'block';", container)
+        container = WebDriverWait(driver, 10).until(
+            EC.visibility_of_element_located((By.CSS_SELECTOR,
+                                              "body > main > div.photoViewer.photoViewerOnPage.show #gallery > div.footer > div > div > div:nth-child(3)"))
+        )
+        driver.execute_script("arguments[0].style.touchAction = 'auto';", container)
+        print(container)
+        next_button = container.find_element(By.CSS_SELECTOR, "span.nav-next")
+        driver.execute_script("arguments[0].style.touchAction = 'auto';", next_button)
+        print(next_button)
+        next_button.click()
 
-            next_button = WebDriverWait(driver, 10).until(
-                EC.element_to_be_clickable(
-                    (By.CSS_SELECTOR, "#gallery > div.footer > div > div > div:nth-child(3) .nav-next"))
-            )
-            print(next_button)
-            next_button.click()
 
-            sleep(1)
 
-            html = driver.page_source
-            soup = BeautifulSoup(html, "html.parser")
-            link_list_next = []
-            carousel = soup.find("div", class_="carousel")
-            print(carousel)
+        driver.execute_script("arguments[0].style.touchAction = 'auto';", next_button)
+
+
+        html = driver.page_source
+        soup = BeautifulSoup(html, "html.parser")
+        link_list_next = []
+        carousel = soup.find("div", class_="carousel")
+        print(carousel)
             # if carousel:
             #     li_tags = carousel.find_all("li")
             #     for li in li_tags:
@@ -175,10 +168,10 @@ def parse_one_property(url):
             #             link_list_next.append(src)
             #
             # if len(link_list_next) == len(link_list):
-            break
+
 
             # Оновіть попередній список зображень
-            previous_link_list = link_list
+            # previous_link_list = link_list
         driver.quit()
         # img_element = driver.find_element(By.ID, "fullImg")
         # photo_url = img_element.get_attribute("src")
@@ -208,7 +201,7 @@ def parse_one_property(url):
         "region": region,
         "price": price,
         "area": area,
-        # "rooms": rooms,
+        "rooms": rooms,
         "description": description_text,
         "images": link_list
 
