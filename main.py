@@ -95,7 +95,14 @@ def parse_one_property(url):
 
     description_element = soup.find('div', class_='property-description')
     if description_element:
-        description_text = description_element.find('div', itemprop='description').get_text(strip=True)
+        try:
+            description_text = description_element.find('div', itemprop='description').get_text(strip=True)
+        except Exception as e:
+            print("Помилка:", e)
+            description_text = None
+
+    else:
+        description_text = None
 
     script_element = soup.select_one(
         "#overview > div:nth-child(3) > div.thumbnail.last-child.first-child > script")
@@ -124,8 +131,13 @@ def parse_one_property(url):
 
 def main():
     links = get_links()
-    parsed_data = [parse_one_property(url) for url in links]
-    print(parsed_data)
+    parsed_data = [parse_one_property(url) for url in links[:1]]
+    file_path = "data.json"
+
+    with open(file_path, "w", encoding="utf-8") as f:
+        json.dump(parsed_data, f, ensure_ascii=False, indent=4)
+
+    print("Дані успішно записані у файл:", file_path)
 
 
 if __name__ == '__main__':
