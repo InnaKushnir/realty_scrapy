@@ -112,7 +112,8 @@ def parse_one_property(url):
         link_list = url_pattern.findall(script_content)
     else:
         link_list = []
-
+    meta_tags = soup.find_all('meta', {'property': 'dc.date.modified'})
+    print(meta_tags)
     data = {
         "link": url,
         "title": title,
@@ -131,7 +132,7 @@ def parse_one_property(url):
 
 def main():
     links = get_links()
-    parsed_data = [parse_one_property(url) for url in links[:1]]
+    parsed_data = [parse_one_property(url) for url in links]
     file_path = "data.json"
 
     with open(file_path, "w", encoding="utf-8") as f:
