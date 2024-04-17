@@ -1,22 +1,13 @@
 import json
 import re
 from wsgiref import headers
-
 import requests
 from bs4 import BeautifulSoup
 from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 
-options = Options()
-options.add_argument('--no-sandbox')
-options.add_argument('--disable-gpu')
-options.add_argument('--disable-software-rasterizer')
-options.add_argument('start-maximized')
-options.add_argument('disable-infobars')
-options.add_argument('disable-extensions')
 
-driver = webdriver.Chrome(options=options)
+driver = webdriver.Chrome()
 
 url = "https://realtylink.org/en/properties~for-rent"
 
