@@ -57,17 +57,21 @@ def parse_one_property(url):
     if title_container:
         title = title_container.text.strip()
     else:
-        title = "Назву не вдалося знайти"
+        title = None
 
     address_container = soup.select_one(
         "#overview > div.row.property-tagline > div.d-none.d-sm-block.house-info > div > div.col.text-left.pl-0 div.d-flex.mt-1 h2.pt-1"
     )
-    address = address_container.text.strip()
+    if address_container:
+        address = address_container.text.strip()
 
-    address_parts = address.split(',', maxsplit=1)
+        address_parts = address.split(',', maxsplit=1)
 
-    region_parts = address_parts[1].strip().split()
-    region = ' '.join(region_parts[-2:])
+        region_parts = address_parts[1].strip().split()
+        region = ' '.join(region_parts[-2:])
+    else:
+        address = None
+        region = None
 
     price_container = soup.select_one(
         "#overview > div.row.property-tagline > div.d-none.d-sm-block.house-info > div > div.price-container > div.price.text-right"
@@ -77,7 +81,7 @@ def parse_one_property(url):
         price = price_container.text.strip()
         price = re.sub(r'[^\d.,]', '', price)
     else:
-        price = "Ціну не вдалося знайти"
+        price = None
 
     area = soup.select_one(
         "#overview > div.grid_3 > div.col-lg-12.description > div:nth-child(6) > div:nth-child(1) > div.carac-value > span")
@@ -92,6 +96,8 @@ def parse_one_property(url):
     if rooms:
         rooms_text = rooms.text.strip()
         rooms = ''.join(filter(str.isdigit, rooms_text))
+    else:
+        rooms = None
 
     description_element = soup.find('div', class_='property-description')
     if description_element:
