@@ -112,8 +112,6 @@ def parse_one_property(url):
         link_list = url_pattern.findall(script_content)
     else:
         link_list = []
-    meta_tags = soup.find_all('meta', {'property': 'dc.date.modified'})
-    print(meta_tags)
     data = {
         "link": url,
         "title": title,
